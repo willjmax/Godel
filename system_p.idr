@@ -8,11 +8,11 @@ predInjective : Predicate x = Predicate y -> x = y
 predInjective Refl = Refl
 
 predNotConst : (order : Order) -> (Predicate order) = Constant -> Void
-predNotConst Z () impossible
+predNotConst Constant () impossible
 predNotConst (Predicate order) () impossible
 
 constNotPred : (order : Order) -> Constant = (Predicate order) -> Void
-constNotPred Z () impossible
+constNotPred Constant () impossible
 constNotPred (Predicate order) () impossible
 
 DecEq Order where
@@ -72,6 +72,9 @@ data Formula : Type where
   Or     : Formula -> Formula -> Formula
   Not    : Formula -> Formula
   ForAll : {order : Order} -> Var order -> Formula -> Formula
+
+--do not implement godel numbering, just define the type signature
+godelNum : Formula -> Nat
 
 data FreeIn : Var order -> Formula -> Type where
   FreeAppL   : (el : Expr (Predicate order)) -> (er : Expr order) -> 
@@ -139,7 +142,7 @@ data PAxiom : Formula -> Type where
               PAxiom (implies (and (App f Zero)
                                   (ForAll x (implies (App f (ExpN x)) 
                                                      (App f (Succ (ExpN x))))))
-                             (ForAll x (App f (ExpN x))))
+                              (ForAll x (App f (ExpN x))))
                                
   PorP  : (p : Formula) -> PAxiom (implies (Or p p) p)
   Intro : (p : Formula) -> (q : Formula) -> PAxiom (implies p (Or p q))
