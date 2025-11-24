@@ -90,3 +90,20 @@ mu phi rho = Comp (sum (prod rho)) (f :: fs) where
   fs : Vect m (PR (n + m))
   f  = Comp phi (take n (projections (n + m)))
   fs = drop n (projections (n + m))
+
+divides : PR 2
+divides = Comp (exists bound relation) [Proj 2 1, Proj 2 0, Proj 2 1] where
+  bound    : PR 1
+  relation : PR 3
+  bound    = Proj 1 0
+  relation = Comp equals [Proj 3 2, Comp mul [Proj 3 0, Proj 3 1]]
+
+isPrime : PR 1
+isPrime = Comp and [Comp neg [Comp (exists (Proj 1 0) relation) [Proj 1 0, Proj 1 0]], gt_one] where
+  gt_one : PR 1
+  gt_one = Comp gt [Proj 1 0, Const 1]
+  relation = Comp and [not_one, Comp and [not_x, divides]] where
+    not_one   : PR 2 
+    not_x     : PR 2 
+    not_one   = Comp neg [Comp equals [Const 1, Proj 2 0]]
+    not_x     = Comp neg [Comp equals [Proj 2 0, Proj 2 1]]
