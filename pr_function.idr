@@ -1,4 +1,3 @@
-import Data.Fin
 import Data.Vect
 
 data PR : Nat -> Type where
@@ -72,6 +71,12 @@ lt = Comp neg [geq]
 gt : PR 2
 gt = Comp neg [leq]
 
+ifelse : PR n -> PR n -> PR n -> PR n
+ifelse cond is_true is_false = 
+  Comp add [
+    Comp mul [is_false, cond],
+    Comp mul [is_true, Comp sub [Const 1, cond]]]
+
 exists : {n : Nat} -> {m : Nat} -> PR n -> PR (S m) -> PR (n + m)
 exists phi rho = Comp (prod rho) (f :: fs) where
   f  : PR (n + m)
@@ -85,11 +90,13 @@ forAll phi rho = Comp neg [exists phi not_rho] where
   not_rho = Comp neg [rho]
 
 mu : {n : Nat} -> {m : Nat} -> PR n -> PR (S m) -> PR (n + m)
-mu phi rho = Comp (sum (prod rho)) (f :: fs) where
-  f  : PR (n + m)
-  fs : Vect m (PR (n + m))
-  f  = Comp phi (take n (projections (n + m)))
-  fs = drop n (projections (n + m))
+mu phi rho = ifelse notfound (Const 0) minimizer where
+  minimizer = Comp (sum (prod rho)) (f :: fs) where
+    f  : PR (n + m)
+    fs : Vect m (PR (n + m))
+    f  = Comp phi (take n (projections (n + m)))
+    fs = drop n (projections (n + m))
+  notfound = Comp equals [minimizer, Comp Succ [Comp phi (take n (projections (n + m)))]]
 
 divides : PR 2
 divides = Comp (exists bound relation) [Proj 2 1, Proj 2 0, Proj 2 1] where
@@ -107,3 +114,23 @@ isPrime = Comp and [Comp neg [Comp (exists (Proj 1 0) relation) [Proj 1 0, Proj 
     not_x     : PR 2 
     not_one   = Comp neg [Comp equals [Const 1, Proj 2 0]]
     not_x     = Comp neg [Comp equals [Proj 2 0, Proj 2 1]]
+
+nthPrimeDiv : PR 2
+nthPrimeDiv = Rec (Const 0) (Comp (mu (Proj 1 0) cond) [Proj 3 2, Proj 3 1, Proj 3 2]) where
+  cond : PR 3
+  cond = Comp and [divides_x, Comp and [y_is_prime, gt_prev]] where
+    divides_x  = Comp divides [Proj 3 0, Proj 3 2]
+    y_is_prime = Comp isPrime [Proj 3 0]
+    gt_prev    = Comp gt [Proj 3 0, Proj 3 1]
+
+fact : PR 1
+fact = Rec (Const 1) (Comp mul [Comp Succ [Proj 2 0], Proj 2 1])
+
+nthPrime : PR 1
+nthPrime = Rec (Const 0) (Comp (mu bound cond) [Proj 2 1, Proj 2 0, Proj 2 1]) where
+  bound : PR 1
+  cond  : PR 3
+  bound = Comp mul [Comp add [Proj 1 0, Const 1], Const 2]
+  cond  = Comp and [y_is_prime, gt_prev] where
+    y_is_prime = Comp isPrime [Proj 3 0]
+    gt_prev    = Comp gt [Proj 3 0, Proj 3 2]
