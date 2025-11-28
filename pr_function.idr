@@ -34,6 +34,9 @@ or = Rec (Const 0) (Comp neg [Comp neg [Proj 3 2]])
 and : PR 2
 and = Comp neg [Comp or [Comp neg [Proj 2 0], Comp neg [Proj 2 1]]]
 
+implies : PR 2
+implies = Comp or [Comp neg [Proj 2 0], Proj 2 1]
+
 pred : PR 1
 pred = Rec (Const 0) (Proj 2 0)
 
@@ -98,6 +101,8 @@ mu phi rho = ifelse notfound (Const 0) minimizer where
     fs = drop n (projections (n + m))
   notfound = Comp equals [minimizer, Comp Succ [Comp phi (take n (projections (n + m)))]]
 
+-- PRIMES
+
 divides : PR 2
 divides = Comp (exists bound relation) [Proj 2 1, Proj 2 0, Proj 2 1] where
   bound    : PR 1
@@ -134,3 +139,152 @@ nthPrime = Rec (Const 0) (Comp (mu bound cond) [Proj 2 1, Proj 2 0, Proj 2 1]) w
   cond  = Comp and [y_is_prime, gt_prev] where
     y_is_prime = Comp isPrime [Proj 3 0]
     gt_prev    = Comp gt [Proj 3 0, Proj 3 2]
+
+-- SEQUENCES
+
+mem : PR 2                       -- y          n         x
+mem = Comp (mu (Proj 1 0) cond) [Proj 2 1, Proj 2 0, Proj 2 1] where
+  cond  : PR 3
+  cond  = Comp and [y_pow_divs, Comp neg [y1_pow_divs]] where
+    y_pow_divs = Comp divides [prime_div_raised_y, Proj 3 2] where
+      prime_div_raised_y = Comp exp [Comp nthPrimeDiv [Proj 3 1, Proj 3 2], Proj 3 0]
+    y1_pow_divs = Comp divides [prime_div_raised_y1, Proj 3 2] where
+      prime_div_raised_y1 = Comp exp [Comp nthPrimeDiv [Proj 3 1, Proj 3 2], Comp Succ [Proj 3 0]]
+
+len : PR 1                      -- y           x
+len = Comp (mu (Proj 1 0) cond) [Proj 1 0, Proj 1 0] where
+  cond : PR 2
+  cond = Comp and [has_nth_prime, no_n1th_prime] where
+    has_nth_prime = Comp gt [Comp nthPrimeDiv [Proj 2 0, Proj 2 1], Const 0]
+    no_n1th_prime = Comp equals [Comp nthPrimeDiv [Comp Succ [Proj 2 0], Proj 2 1], Const 0]
+
+concat : PR 2                    ---    z             x          y
+concat = Comp (mu bound cond) [Proj 2 0, Proj 2 1, Proj 2 0, Proj 2 1] where
+  bound : PR 2
+  cond  : PR 3
+  bound = Comp exp [Comp nthPrime [Comp add [Comp len [Proj 2 0], Comp len [Proj 2 1]]],
+                    Comp add [Proj 2 0, Proj 2 1]]
+
+  cond  = Comp and [forall1, forall2] where -- n        x         z
+    forall1 = Comp (forAll bound1 cond1) [Proj 3 1, Proj 3 1, Proj 3 0] where
+      bound1 : PR 1
+      cond1  : PR 3
+      bound1 = Comp len [Proj 1 0]
+      cond1  = Comp equals [Comp mem [Proj 3 0, Proj 3 2], Comp mem [Proj 3 0, Proj 3 1]]
+
+                                        --   n         x          y          z
+    forall2 = Comp (forAll bound2 cond2) [Proj 3 2, Proj 3 1, Proj 3 2, Proj 3 0] where
+      bound2 : PR 1
+      cond2  : PR 4
+      bound2 = Comp len [Proj 1 0]
+      cond2  = Comp implies [Comp lt [Const 0, Proj 4 0],
+                             Comp equals [Comp mem [Comp add [Proj 4 0, Comp len [Proj 4 1]], Proj 4 3],
+                                          Comp mem [Proj 4 0, Proj 4 2]]]
+
+seq : PR 1
+seq = Comp exp [Const 2, Proj 1 0]
+
+data SystemP : Type where
+  Zero   : SystemP
+  F      : SystemP
+  Neg    : SystemP
+  Or     : SystemP
+  ForAll : SystemP
+  LParen : SystemP
+  RParen : SystemP
+
+build_sym : SystemP -> PR n
+build_sym Zero = Const 1
+build_sym F    = Const 3
+build_sym Neg  = Const 5
+build_sym Or   = Const 7
+build_sym ForAll = Const 9
+build_sym LParen = Const 11
+build_sym RParen = Const 13
+
+build_seq : SystemP -> PR n
+build_seq sym = Comp seq [build_sym sym]
+
+parens: PR 1
+parens = Comp concat [build_seq LParen, Comp concat [Proj 1 0, Comp seq [build_seq RParen]]]
+
+isVarType : PR 2                        --z        n         x
+isVarType = Comp (exists bound cond) [Proj 2 1, Proj 2 0, Proj 2 1] where
+  bound : PR 1
+  cond  : PR 3
+  bound = Proj 1 0
+  cond  = Comp and [Comp lt [build_seq RParen, Proj 3 0],
+                    Comp and [Comp isPrime [Proj 3 0], 
+                              Comp equals [Comp exp [Proj 3 0, Proj 3 1], 
+                                           Proj 3 2]]]
+
+isVar : PR 1
+isVar = Comp (exists bound cond) [Proj 1 0, Proj 1 0] where
+  bound = Proj 1 0
+  cond  = Comp isVarType [Proj 2 0, Proj 2 1]
+
+-- FORMULA BUILDERS
+
+form_not : PR 1
+form_not = Comp concat [build_seq Neg, Comp parens [Proj 1 0]]
+
+form_or : PR 2
+form_or = Comp concat [Comp parens [Proj 2 0], Comp concat [build_seq ForAll, Comp parens [Proj 2 1]]]
+
+form_forall : PR 2
+form_forall = Comp concat [build_seq ForAll, Comp concat [Comp seq [Proj 2 0], Comp parens [Proj 2 1]]]
+
+--- Expressions of type n
+
+nthSucc : PR 2
+nthSucc = Rec (Proj 1 0) (Comp concat [build_seq F, Proj 3 1])
+
+num : Nat -> PR 0
+num n = Comp nthSucc [Const n, build_seq Zero]
+
+isType1 : PR 1                           --n        x
+isType1 = Comp (exists bound1 cond1) [Proj 1 0, Proj 1 0] where
+  bound1 = Proj 1 0                     --m          n       x
+  cond1  = Comp (exists bound2 cond2) [Proj 2 1, Proj 2 0, Proj 2 1] where
+    bound2 = Proj 1 0
+    cond2  = Comp and [Comp equals [Proj 3 2, Comp nthSucc [Proj 3 1, Comp seq [Proj 3 0]]],
+                       Comp or [Comp equals [Proj 3 0, build_seq Zero],
+                                Comp isVarType [Const 1, Proj 3 0]]]
+
+isTypeN : PR 2
+isTypeN = Comp or [p1, p2] where
+  p1 = Comp and [Comp equals [Proj 2 0, Const 1], Comp isType1 [Proj 2 1]]
+  p2 = Comp and [Comp gt [Const 1, Proj 2 0], existential] where
+    existential = Comp (exists (Proj 1 0) cond) [Proj 2 1, Proj 2 0, Proj 2 1] where
+      cond = Comp and [Comp isVarType [Proj 3 1, Proj 3 0], Comp equals [Proj 3 2, Comp seq [Proj 3 0]]]
+
+-- FORMULAS
+
+isElForm : PR 1                           -- n        z         y         x
+isElForm = Comp (exists (Proj 1 0) p1) [Proj 1 0, Proj 1 0, Proj 1 0, Proj 1 0] where
+  p1 = Comp (exists (Proj 1 0) p2) [Proj 4 1, Proj 4 0, Proj 4 2, Proj 4 3] where -- z n y x
+    p2 = Comp (exists (Proj 1 0) p3) [Proj 4 2, Proj 4 0, Proj 4 1, Proj 4 3]  where --y z n x
+      p3 = Comp and [p4, Comp and [p5, p6]] where
+        p4 = Comp isTypeN [Proj 4 2, Proj 4 0]
+        p5 = Comp isTypeN [Comp Succ [Proj 4 2], Proj 4 1]
+        p6 = Comp equals [Proj 4 1, Comp parens [Proj 4 0]]
+
+isLogOp : PR 3
+isLogOp = Comp or [is_not, Comp or [is_or, is_forall]] where
+  is_not    = Comp equals [Proj 3 0, Comp form_not [Proj 3 1]]
+  is_or     = Comp equals [Proj 3 0, Comp form_or [Proj 3 1, Proj 3 2]]
+  is_forall = Comp (exists (Proj 1 0) is_equal) [Proj 3 0, Proj 3 0, Proj 3 1] where
+    is_equal = Comp equals [Proj 3 1, Comp form_forall [Proj 3 0, Proj 3 2]]
+
+isFormSeq : PR 1
+isFormSeq = Comp and [Comp (forAll bound cond) [Proj 1 0, Proj 1 0], not_zero] where
+  bound = Comp len [Proj 1 0]
+  not_zero = Comp gt [Comp len [Proj 1 0], Const 0]
+  cond  = Comp implies [Comp gt [Const 0, Proj 2 0], rhs] where
+    rhs = Comp or [p1, ex1] where
+      p1 = Comp isElForm [Comp mem [Proj 2 0, Proj 2 1]]
+      ex1 = Comp (exists (Proj 1 0) ex2) [Proj 2 0, Proj 2 0, Proj 2 1] where -- q, n, x
+        ex2 = Comp (exists (Proj 1 0) cond) [Proj 3 1, Proj 3 0, Proj 3 1, Proj 3 2] where -- p,q,n,x
+          cond = Comp isLogOp [Comp mem [Proj 4 2, Proj 4 3],
+                               Comp mem [Proj 4 0, Proj 4 3],
+                               Comp mem [Proj 4 1, Proj 4 3]]
